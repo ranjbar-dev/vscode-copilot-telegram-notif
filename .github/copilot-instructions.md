@@ -20,7 +20,7 @@ Active scope: **Phase 1 MVP only** (v0.1.0). See `memory/constitution.md` for th
 | Bot token storage | `vscode.SecretStorage` |
 | Chat ID storage | `vscode.workspace.getConfiguration` |
 | Test framework | Mocha + `@vscode/test-electron` |
-| Build | `esbuild` or `tsc` (standard VS Code extension toolchain) |
+| Build | `tsc` (TypeScript compiler; `esbuild` is a devDep but not used in build scripts) |
 | Package manager | npm |
 
 ---
@@ -38,9 +38,8 @@ npm run compile
 # Watch mode
 npm run watch
 
-# Run extension tests
+# Run extension tests (compiles first, then launches @vscode/test-electron)
 npm run test
-# or: npx vscode-test
 
 # Lint
 npm run lint
@@ -73,10 +72,15 @@ npx vsce package
 │   ├── statusBar.ts              ← status bar item lifecycle
 │   └── constants.ts              ← all string constants
 ├── test/
+│   ├── runTest.ts                ← @vscode/test-electron entry point
 │   └── suite/
+│       ├── configManager.test.ts
+│       ├── index.ts
 │       ├── notifier.test.ts
+│       ├── participant.test.ts
 │       ├── secretManager.test.ts
-│       └── index.ts
+│       ├── statusBar.test.ts
+│       └── wizard.test.ts
 ├── PDR.md                        ← Product Requirements Document
 ├── package.json
 ├── tsconfig.json
@@ -104,8 +108,6 @@ All settings live under `copilotNotify.*`:
 |---|---|---|---|
 | `copilotNotify.enabled` | boolean | settings.json | Master on/off switch |
 | `copilotNotify.telegramChatId` | string | settings.json | Not a secret |
-| `copilotNotify.notifyOnSuccess` | boolean | settings.json | |
-| `copilotNotify.notifyOnFailure` | boolean | settings.json | |
 | Bot Token | string | SecretStorage | Key: `copilotNotify.botToken` |
 
 ---
