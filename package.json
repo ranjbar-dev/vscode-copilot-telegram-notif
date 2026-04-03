@@ -1,0 +1,85 @@
+{
+  "name": "copilotnotify",
+  "displayName": "CopilotNotify",
+  "description": "Sends a Telegram push notification when the CopilotNotify chat participant finishes responding.",
+  "version": "0.1.0",
+  "publisher": "devbehkami",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": ">=1.90.0"
+  },
+  "categories": [
+    "Chat"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/src/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "copilotnotify",
+        "name": "copilotnotify",
+        "description": "Notifies you on Telegram when this participant finishes responding.",
+        "isSticky": false
+      }
+    ],
+    "commands": [
+      {
+        "command": "copilotNotify.configure",
+        "title": "CopilotNotify: Configure Telegram"
+      },
+      {
+        "command": "copilotNotify.enable",
+        "title": "CopilotNotify: Enable"
+      },
+      {
+        "command": "copilotNotify.disable",
+        "title": "CopilotNotify: Disable"
+      },
+      {
+        "command": "copilotNotify.sendTest",
+        "title": "CopilotNotify: Send Test Notification"
+      },
+      {
+        "command": "copilotNotify.showLogs",
+        "title": "CopilotNotify: Show Logs"
+      }
+    ],
+    "configuration": {
+      "title": "CopilotNotify",
+      "properties": {
+        "copilotNotify.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable Telegram notifications from the CopilotNotify participant."
+        },
+        "copilotNotify.telegramChatId": {
+          "type": "string",
+          "default": "",
+          "description": "Your Telegram chat ID (personal, group, or channel). Not a secret — bot token is stored separately in SecretStorage."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "node -e \"require('fs').rmSync('out', { recursive: true, force: true })\" && tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "tsc -p ./ && node out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.19.39",
+    "@types/vscode": "^1.90.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/test-electron": "^2.4.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.57.0",
+    "mocha": "^10.4.0",
+    "typescript": "^5.4.0"
+  }
+}

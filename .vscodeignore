@@ -1,0 +1,15 @@
+src/**
+test/**
+node_modules/**
+*.ts
+.eslintrc.json
+tsconfig.json
+.vscode/**
+coverage/**
+memory/**
+specs/**
+.github/**
+PDR.md
+out/test/**
+out/**/*.map
+
