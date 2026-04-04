@@ -4,7 +4,7 @@
 
 **CopilotNotify** is a VS Code extension that sends Telegram notifications when GitHub Copilot agent tasks complete. It is privacy-first and serverless: the extension calls the Telegram Bot API directly from the editor, with no backend.
 
-Active scope: **Phase 1 MVP only** (v0.1.0). See `memory/constitution.md` for the full constitution.
+Active scope: **Phase 1 and Phase 2 complete** (v0.2.0). See `memory/constitution.md` for the full constitution.
 
 ---
 
@@ -51,12 +51,17 @@ npx vsce package
 
 ---
 
-## Project Structure (Phase 1 Target)
+## Project Structure
 
 ```
 .
 ├── .github/
-│   └── copilot-instructions.md   ← this file
+│   ├── copilot-instructions.md   ← this file
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md
+│   │   └── feature_request.md
+│   └── workflows/
+│       └── ci.yml                ← CI: compile + test on push/PR
 ├── memory/
 │   └── constitution.md           ← immutable project decisions
 ├── specs/
@@ -65,10 +70,10 @@ npx vsce package
 │   └── done/                     ← completed specs
 ├── src/
 │   ├── extension.ts              ← activate/deactivate entry point
-│   ├── participant.ts            ← Copilot chat participant + task detection
-│   ├── notifier.ts               ← Telegram dispatch logic
+│   ├── participant.ts            ← Copilot chat participant + task detection + metadata
+│   ├── notifier.ts               ← Telegram dispatch, payload building, format variants, cooldown
 │   ├── secretManager.ts          ← SecretStorage wrapper for bot token
-│   ├── configManager.ts          ← workspace settings accessor
+│   ├── configManager.ts          ← workspace settings accessor (Phase 1 + Phase 2 keys)
 │   ├── statusBar.ts              ← status bar item lifecycle
 │   └── constants.ts              ← all string constants
 ├── test/
@@ -81,9 +86,12 @@ npx vsce package
 │       ├── secretManager.test.ts
 │       ├── statusBar.test.ts
 │       └── wizard.test.ts
+├── CHANGELOG.md
+├── LICENSE
 ├── PDR.md                        ← Product Requirements Document
+├── README.md
 ├── package.json
-├── tsconfig.json
+├── tsconfig.json                 ← "types": ["node"] required for test files
 └── .vscodeignore
 ```
 
@@ -108,6 +116,10 @@ All settings live under `copilotNotify.*`:
 |---|---|---|---|
 | `copilotNotify.enabled` | boolean | settings.json | Master on/off switch |
 | `copilotNotify.telegramChatId` | string | settings.json | Not a secret |
+| `copilotNotify.notifyOnSuccess` | boolean | settings.json | Send notification on successful task completion (default: true) |
+| `copilotNotify.notifyOnFailure` | boolean | settings.json | Send notification on cancelled/failed task (default: true) |
+| `copilotNotify.cooldownSeconds` | integer | settings.json | Min seconds between notifications; 0 = no cooldown (default: 5) |
+| `copilotNotify.messageFormat` | string | settings.json | `'default'` (label + workspace + duration + outcome + timestamp) or `'minimal'` (label + timestamp) |
 | Bot Token | string | SecretStorage | Key: `copilotNotify.botToken` |
 
 ---
@@ -128,7 +140,6 @@ All settings live under `copilotNotify.*`:
 - Do NOT read, log, or transmit any code content or prompt text
 - Do NOT store the bot token in `settings.json` or workspace state
 - Do NOT add backend servers, proxies, or third-party services
-- Do NOT implement Phase 2+ features until Phase 1 spec is done
 - Do NOT use `axios`, `node-fetch`, or other HTTP libs — `fetch` only
 - Do NOT add telemetry or analytics of any kind
 - Do NOT use internal Copilot APIs that are not part of the public VS Code extension surface

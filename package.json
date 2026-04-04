@@ -2,7 +2,7 @@
   "name": "copilotnotify",
   "displayName": "CopilotNotify",
   "description": "Sends a Telegram push notification when the CopilotNotify chat participant finishes responding.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "devbehkami",
   "private": true,
   "license": "MIT",
@@ -59,6 +59,28 @@
           "type": "string",
           "default": "",
           "description": "Your Telegram chat ID (personal, group, or channel). Not a secret — bot token is stored separately in SecretStorage."
+        },
+        "copilotNotify.notifyOnSuccess": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send a Telegram notification when a Copilot agent task completes successfully."
+        },
+        "copilotNotify.notifyOnFailure": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send a Telegram notification when a Copilot agent task fails or is cancelled."
+        },
+        "copilotNotify.cooldownSeconds": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 0,
+          "description": "Minimum number of seconds between consecutive notifications. Set to 0 to disable cooldown."
+        },
+        "copilotNotify.messageFormat": {
+          "type": "string",
+          "enum": ["default", "minimal"],
+          "default": "default",
+          "description": "Notification message format. 'default' includes status and task label; 'minimal' sends a short one-liner."
         }
       }
     }

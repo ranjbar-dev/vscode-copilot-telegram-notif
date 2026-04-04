@@ -40,3 +40,29 @@ export const WIZARD_ERROR_CHAT_ID_EMPTY = 'Chat ID must not be empty.';
 // Test command messages
 export const TEST_SUCCESS_MESSAGE = 'CopilotNotify: Test notification sent successfully.';
 export const TEST_FAILURE_WARNING_PREFIX = 'CopilotNotify: Test notification failed — ';
+
+// Phase 2 config keys
+export const CONFIG_NOTIFY_ON_SUCCESS = 'notifyOnSuccess';
+export const CONFIG_NOTIFY_ON_FAILURE = 'notifyOnFailure';
+export const CONFIG_COOLDOWN_SECONDS = 'cooldownSeconds';
+export const CONFIG_MESSAGE_FORMAT = 'messageFormat';
+
+// Outcome values
+export const OUTCOME_COMPLETED = 'completed';
+export const OUTCOME_CANCELLED = 'cancelled';
+
+// Message format values
+export const FORMAT_DEFAULT = 'default';
+export const FORMAT_MINIMAL = 'minimal';
+
+// Suppression log prefix constants (runtime appends remaining-seconds suffix to SUPPRESSED_COOLDOWN)
+export const SUPPRESSED_OUTCOME_SUCCESS = "[CopilotNotify] Notification suppressed — notifyOnSuccess is false";
+export const SUPPRESSED_OUTCOME_FAILURE = "[CopilotNotify] Notification suppressed — notifyOnFailure is false";
+export const SUPPRESSED_COOLDOWN = "[CopilotNotify] Notification suppressed — cooldown active";
+
+// Format-fallback warning
+export const WARN_UNKNOWN_FORMAT = "[CopilotNotify] Unknown messageFormat value; falling back to 'default'";
+
+// Missing-credential warnings (for use in extension.ts sendTest guard)
+export const WARN_MISSING_BOT_TOKEN = 'CopilotNotify: Bot token is not configured.';
+export const WARN_MISSING_CHAT_ID = 'CopilotNotify: Chat ID is not configured.';

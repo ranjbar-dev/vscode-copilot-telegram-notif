@@ -7,6 +7,8 @@ import {
     CMD_SEND_TEST,
     CMD_SHOW_LOGS,
     TEST_SUCCESS_MESSAGE,
+    WARN_MISSING_BOT_TOKEN,
+    WARN_MISSING_CHAT_ID,
 } from './constants';
 import { createSecretManager, SecretManager } from './secretManager';
 import { createConfigManager, ConfigManager } from './configManager';
@@ -31,8 +33,8 @@ async function computeState(
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     const outputChannel = vscode.window.createOutputChannel(CHANNEL_NAME);
     const secretManager = createSecretManager(context.secrets);
-    const configManager = createConfigManager();
-    const notifier = createNotifier(outputChannel);
+    const configManager = createConfigManager(outputChannel);
+    const notifier = createNotifier(outputChannel, configManager);
     const statusBarManager = createStatusBarManager();
 
     const initialState = await computeState(secretManager, configManager);
@@ -78,19 +80,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             return;
         }
         if (!token) {
-            await vscode.window.showWarningMessage(
-                'CopilotNotify: Bot token is not configured.',
-            );
+            await vscode.window.showWarningMessage(WARN_MISSING_BOT_TOKEN);
             return;
         }
         if (!chatId) {
-            await vscode.window.showWarningMessage(
-                'CopilotNotify: Chat ID is not configured.',
-            );
+            await vscode.window.showWarningMessage(WARN_MISSING_CHAT_ID);
             return;
         }
 
-        const result = await notifier.sendNotification(token, chatId);
+        const result = await notifier.sendTestNotification(token, chatId);
         if (result.success) {
             await vscode.window.showInformationMessage(TEST_SUCCESS_MESSAGE);
         } else {

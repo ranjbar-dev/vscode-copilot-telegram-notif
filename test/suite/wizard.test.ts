@@ -25,6 +25,10 @@ function makeConfigManager(initialChatId = ''): TrackedConfigManager {
             chatId = v;
         },
         async setEnabled(_v: boolean): Promise<void> { /* noop */ },
+        getNotifyOnSuccess(): boolean { return true; },
+        getNotifyOnFailure(): boolean { return true; },
+        getCooldownSeconds(): number { return 0; },
+        getMessageFormat(): 'default' | 'minimal' { return 'default'; },
     };
 }
 

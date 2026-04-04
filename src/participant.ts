@@ -4,10 +4,12 @@ import {
     PARTICIPANT_RESPONSE_LABEL,
     WIZARD_ERROR_TOKEN_EMPTY,
     WIZARD_ERROR_CHAT_ID_EMPTY,
+    OUTCOME_COMPLETED,
+    OUTCOME_CANCELLED,
 } from './constants';
 import { SecretManager } from './secretManager';
 import { ConfigManager } from './configManager';
-import { Notifier } from './notifier';
+import { Notifier, NotificationTaskMetadata } from './notifier';
 
 export async function runSetupWizard(
     secrets: SecretManager,
@@ -58,6 +60,17 @@ export async function runSetupWizard(
     return 'completed';
 }
 
+export function buildTaskMetadata(
+    startTime: number,
+    endTime: number,
+    token: vscode.CancellationToken,
+): NotificationTaskMetadata {
+    return {
+        durationSeconds: Math.floor((endTime - startTime) / 1000),
+        outcome: token.isCancellationRequested ? OUTCOME_CANCELLED : OUTCOME_COMPLETED,
+    };
+}
+
 export function registerParticipant(
     _context: vscode.ExtensionContext,
     notifier: Notifier,
@@ -71,8 +84,9 @@ export function registerParticipant(
             _request: vscode.ChatRequest,
             _ctx: vscode.ChatContext,
             response: vscode.ChatResponseStream,
-            _token: vscode.CancellationToken,
+            token: vscode.CancellationToken,
         ) => {
+            const startTime = Date.now();
             response.markdown(PARTICIPANT_RESPONSE_LABEL);
 
             if (!config.getEnabled()) {
@@ -87,7 +101,9 @@ export function registerParticipant(
                 return;
             }
 
-            void notifier.sendNotification(botToken, chatId).then(result => {
+            const endTime = Date.now();
+            const metadata = buildTaskMetadata(startTime, endTime, token);
+            void notifier.sendNotification(botToken, chatId, metadata).then(result => {
                 if (!result.success) {
                     outputChannel.appendLine(result.errorMessage);
                 }

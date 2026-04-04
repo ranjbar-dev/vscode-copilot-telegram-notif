@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import { registerParticipant } from '../../src/participant';
-import { PARTICIPANT_RESPONSE_LABEL } from '../../src/constants';
+import { registerParticipant, buildTaskMetadata } from '../../src/participant';
+import { PARTICIPANT_RESPONSE_LABEL, OUTCOME_COMPLETED, OUTCOME_CANCELLED } from '../../src/constants';
 import type { SecretManager } from '../../src/secretManager';
 import type { ConfigManager } from '../../src/configManager';
-import type { Notifier, NotificationResult } from '../../src/notifier';
+import type { Notifier, NotificationResult, NotificationTaskMetadata } from '../../src/notifier';
 
 // ── Inline assertion helpers ────────────────────────────────────────────────
 
@@ -81,19 +81,24 @@ function makeStubConfigManager(enabled: boolean, chatId: string): ConfigManager 
         getChatId: (): string => chatId,
         setChatId: (_v: string): Promise<void> => Promise.resolve(),
         setEnabled: (_v: boolean): Promise<void> => Promise.resolve(),
+        getNotifyOnSuccess: (): boolean => true,
+        getNotifyOnFailure: (): boolean => true,
+        getCooldownSeconds: (): number => 0,
+        getMessageFormat: (): 'default' | 'minimal' => 'default',
     };
 }
 
-type SpyNotifier = Notifier & { readonly calls: Array<{ token: string; chatId: string }> };
+type SpyNotifier = Notifier & { readonly calls: Array<{ token: string; chatId: string; metadata: NotificationTaskMetadata }> };
 
 function makeSpyNotifier(result: NotificationResult): SpyNotifier {
-    const calls: Array<{ token: string; chatId: string }> = [];
+    const calls: Array<{ token: string; chatId: string; metadata: NotificationTaskMetadata }> = [];
     return {
         calls,
-        sendNotification: (token: string, chatId: string): Promise<NotificationResult> => {
-            calls.push({ token, chatId });
+        sendNotification: (token: string, chatId: string, metadata: NotificationTaskMetadata): Promise<NotificationResult> => {
+            calls.push({ token, chatId, metadata });
             return Promise.resolve(result);
         },
+        sendTestNotification: (_token: string, _chatId: string): Promise<NotificationResult> => Promise.resolve(result),
     };
 }
 
@@ -222,5 +227,37 @@ suite('registerParticipant', () => {
         strictEqual(notifier.calls.length, 1);
         strictEqual(channel.lines.length, 1);
         strictEqual(channel.lines[0], 'boom');
+    });
+});
+
+suite('buildTaskMetadata', () => {
+    test('outcome is completed when cancellation not requested', () => {
+        const token = { isCancellationRequested: false } as vscode.CancellationToken;
+        const meta = buildTaskMetadata(1000, 3500, token);
+        strictEqual(meta.outcome, OUTCOME_COMPLETED);
+    });
+
+    test('outcome is cancelled when cancellation requested', () => {
+        const token = { isCancellationRequested: true } as vscode.CancellationToken;
+        const meta = buildTaskMetadata(1000, 3500, token);
+        strictEqual(meta.outcome, OUTCOME_CANCELLED);
+    });
+
+    test('zero elapsed time yields durationSeconds 0', () => {
+        const token = { isCancellationRequested: false } as vscode.CancellationToken;
+        const meta = buildTaskMetadata(5000, 5000, token);
+        strictEqual(meta.durationSeconds, 0);
+    });
+
+    test('1500ms elapsed yields durationSeconds 1', () => {
+        const token = { isCancellationRequested: false } as vscode.CancellationToken;
+        const meta = buildTaskMetadata(0, 1500, token);
+        strictEqual(meta.durationSeconds, 1);
+    });
+
+    test('999ms elapsed yields durationSeconds 0', () => {
+        const token = { isCancellationRequested: false } as vscode.CancellationToken;
+        const meta = buildTaskMetadata(0, 999, token);
+        strictEqual(meta.durationSeconds, 0);
     });
 });

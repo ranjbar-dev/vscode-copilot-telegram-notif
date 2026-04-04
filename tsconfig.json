@@ -6,6 +6,7 @@
     "outDir": "./out",
     "rootDir": ".",
     "lib": ["ES2020"],
+    "types": ["node"],
     "sourceMap": true,
     "skipLibCheck": true
   },
