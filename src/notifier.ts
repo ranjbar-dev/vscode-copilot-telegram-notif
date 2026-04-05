@@ -1,168 +1,155 @@
 import * as vscode from 'vscode';
-import {
-    COMPLETION_LABEL,
-    OUTCOME_COMPLETED,
-    OUTCOME_CANCELLED,
-    SUPPRESSED_OUTCOME_SUCCESS,
-    SUPPRESSED_OUTCOME_FAILURE,
-    SUPPRESSED_COOLDOWN,
-    telegramApiUrl,
-} from './constants';
 import { ConfigManager } from './configManager';
+import {
+	COMPLETION_LABEL,
+	FORMAT_MINIMAL,
+	OUTCOME_CANCELLED,
+	OUTCOME_COMPLETED,
+	SUPPRESSED_COOLDOWN,
+	SUPPRESSED_OUTCOME_FAILURE,
+	SUPPRESSED_OUTCOME_SUCCESS,
+	telegramApiUrl,
+} from './constants';
 
 export interface NotificationTaskMetadata {
-    durationSeconds: number;
-    outcome: 'completed' | 'cancelled';
+	readonly durationSeconds: number;
+	readonly outcome: 'completed' | 'cancelled';
 }
 
 export interface NotificationPayload {
-    label: string;
-    workspaceName: string | undefined;
-    timestamp: string;
-    durationSeconds?: number;
-    outcome?: 'completed' | 'cancelled';
+	readonly label: string;
+	readonly workspaceName?: string;
+	readonly timestamp: string;
+	readonly durationSeconds?: number;
+	readonly outcome?: 'completed' | 'cancelled';
 }
 
 export type NotificationResult =
-    | { success: true }
-    | { success: false; errorMessage: string };
+	| { readonly success: true }
+	| { readonly success: false; readonly errorMessage: string };
 
 export interface Notifier {
-    sendNotification(token: string, chatId: string, metadata: NotificationTaskMetadata): Promise<NotificationResult>;
-    sendTestNotification(token: string, chatId: string): Promise<NotificationResult>;
+	sendNotification(
+		token: string,
+		chatId: string,
+		metadata: NotificationTaskMetadata,
+	): Promise<NotificationResult>;
+	sendTestNotification(token: string, chatId: string): Promise<NotificationResult>;
 }
 
 export function buildPayload(metadata: NotificationTaskMetadata): NotificationPayload {
-    return {
-        label: COMPLETION_LABEL,
-        workspaceName: vscode.workspace.workspaceFolders?.[0]?.name,
-        timestamp: new Date().toISOString(),
-        durationSeconds: metadata.durationSeconds,
-        outcome: metadata.outcome,
-    };
+	return {
+		label: COMPLETION_LABEL,
+		workspaceName: vscode.workspace.workspaceFolders?.[0]?.name,
+		timestamp: new Date().toISOString(),
+		durationSeconds: metadata.durationSeconds,
+		outcome: metadata.outcome,
+	};
 }
 
-export function formatMessage(payload: NotificationPayload, format: 'default' | 'minimal'): string {
-    if (format === 'minimal') {
-        return [payload.label, payload.timestamp].join('\n');
-    }
-    // 'default' format
-    const lines: string[] = [payload.label];
-    if (payload.workspaceName !== undefined) {
-        lines.push(`Workspace: ${payload.workspaceName}`);
-    }
-    if (payload.durationSeconds !== undefined) {
-        lines.push(`Duration: ${payload.durationSeconds}s`);
-    }
-    if (payload.outcome !== undefined) {
-        lines.push(`Outcome: ${payload.outcome}`);
-    }
-    lines.push(payload.timestamp);
-    return lines.join('\n');
+export function formatMessage(
+	payload: NotificationPayload,
+	format: 'default' | 'minimal',
+): string {
+	if (format === FORMAT_MINIMAL) {
+		return [payload.label, payload.timestamp].join('\n');
+	}
+
+	const lines = [payload.label];
+	if (payload.workspaceName !== undefined) {
+		lines.push(`Workspace: ${payload.workspaceName}`);
+	}
+	if (payload.durationSeconds !== undefined) {
+		lines.push(`Duration: ${payload.durationSeconds}s`);
+	}
+	if (payload.outcome !== undefined) {
+		lines.push(`Outcome: ${payload.outcome}`);
+	}
+	lines.push(payload.timestamp);
+
+	return lines.join('\n');
 }
 
-export function createNotifier(outputChannel: vscode.OutputChannel, config: ConfigManager): Notifier {
-    let lastDispatchedAt: number | undefined = undefined;
+export function createNotifier(
+	outputChannel: vscode.OutputChannel,
+	config: ConfigManager,
+): Notifier {
+	let lastDispatchedAt: number | undefined;
 
-    return {
-        async sendNotification(token: string, chatId: string, metadata: NotificationTaskMetadata): Promise<NotificationResult> {
-            const notifyOnSuccess = config.getNotifyOnSuccess();
-            const notifyOnFailure = config.getNotifyOnFailure();
+	async function postMessage(token: string, chatId: string, text: string): Promise<NotificationResult> {
+		try {
+			const response = await fetch(telegramApiUrl(token), {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ chat_id: chatId, text }),
+			});
 
-            if (metadata.outcome === OUTCOME_COMPLETED && !notifyOnSuccess) {
-                outputChannel.appendLine(SUPPRESSED_OUTCOME_SUCCESS);
-                return { success: true };
-            }
+			if (response.ok) {
+				return { success: true };
+			}
 
-            if (metadata.outcome === OUTCOME_CANCELLED && !notifyOnFailure) {
-                outputChannel.appendLine(SUPPRESSED_OUTCOME_FAILURE);
-                return { success: true };
-            }
+			const status = response.status;
+			try {
+				const json = await response.json() as { description?: unknown };
+				const description = typeof json.description === 'string' ? json.description : undefined;
+				const errorMessage = description
+					? `Telegram error ${status}: ${description}`
+					: `Telegram error ${status}`;
+				outputChannel.appendLine(errorMessage);
+				return { success: false, errorMessage };
+			} catch {
+				const errorMessage = `Telegram error ${status}`;
+				outputChannel.appendLine(errorMessage);
+				return { success: false, errorMessage };
+			}
+		} catch (error: unknown) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			outputChannel.appendLine(errorMessage);
+			return { success: false, errorMessage };
+		}
+	}
 
-            const cooldownSeconds = config.getCooldownSeconds();
-            if (cooldownSeconds > 0 && lastDispatchedAt !== undefined) {
-                const elapsedSeconds = (Date.now() - lastDispatchedAt) / 1000;
-                if (elapsedSeconds < cooldownSeconds) {
-                    const remainingSeconds = cooldownSeconds - elapsedSeconds;
-                    outputChannel.appendLine(
-                        `${SUPPRESSED_COOLDOWN} ${Math.ceil(remainingSeconds)}s remaining`
-                    );
-                    return { success: true };
-                }
-            }
+	return {
+		async sendNotification(
+			token: string,
+			chatId: string,
+			metadata: NotificationTaskMetadata,
+		): Promise<NotificationResult> {
+			if (metadata.outcome === OUTCOME_COMPLETED && !config.getNotifyOnSuccess()) {
+				outputChannel.appendLine(SUPPRESSED_OUTCOME_SUCCESS);
+				return { success: true };
+			}
 
-            const messageFormat = config.getMessageFormat();
-            const payload = buildPayload(metadata);
-            const text = formatMessage(payload, messageFormat);
+			if (metadata.outcome === OUTCOME_CANCELLED && !config.getNotifyOnFailure()) {
+				outputChannel.appendLine(SUPPRESSED_OUTCOME_FAILURE);
+				return { success: true };
+			}
 
-            try {
-                const response = await fetch(telegramApiUrl(token), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chat_id: chatId, text }),
-                });
+			const cooldownSeconds = config.getCooldownSeconds();
+			if (cooldownSeconds > 0 && lastDispatchedAt !== undefined) {
+				const elapsedSeconds = (Date.now() - lastDispatchedAt) / 1000;
+				if (elapsedSeconds < cooldownSeconds) {
+					const remainingSeconds = cooldownSeconds - elapsedSeconds;
+					outputChannel.appendLine(
+						`${SUPPRESSED_COOLDOWN} ${Math.ceil(remainingSeconds)}s remaining`,
+					);
+					return { success: true };
+				}
+			}
 
-                if (response.ok) {
-                    lastDispatchedAt = Date.now();
-                    return { success: true };
-                }
+			const messageFormat = config.getMessageFormat();
+			const payload = buildPayload(metadata);
+			const text = formatMessage(payload, messageFormat);
+			const result = await postMessage(token, chatId, text);
+			if (result.success) {
+				lastDispatchedAt = Date.now();
+			}
+			return result;
+		},
 
-                const status = response.status;
-                try {
-                    const json = await response.json() as { description?: unknown };
-                    const description =
-                        typeof json.description === 'string' ? json.description : undefined;
-                    const errorMessage = description
-                        ? `Telegram error ${status}: ${description}`
-                        : `Telegram error ${status}`;
-                    outputChannel.appendLine(errorMessage);
-                    return { success: false, errorMessage };
-                } catch {
-                    const errorMessage = `Telegram error ${status}`;
-                    outputChannel.appendLine(errorMessage);
-                    return { success: false, errorMessage };
-                }
-            } catch (err: unknown) {
-                const errorMessage = err instanceof Error ? err.message : String(err);
-                outputChannel.appendLine(errorMessage);
-                return { success: false, errorMessage };
-            }
-        },
-
-        async sendTestNotification(token: string, chatId: string): Promise<NotificationResult> {
-            const text = COMPLETION_LABEL;
-
-            try {
-                const response = await fetch(telegramApiUrl(token), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chat_id: chatId, text }),
-                });
-
-                if (response.ok) {
-                    return { success: true };
-                }
-
-                const status = response.status;
-                try {
-                    const json = await response.json() as { description?: unknown };
-                    const description =
-                        typeof json.description === 'string' ? json.description : undefined;
-                    const errorMessage = description
-                        ? `Telegram error ${status}: ${description}`
-                        : `Telegram error ${status}`;
-                    outputChannel.appendLine(errorMessage);
-                    return { success: false, errorMessage };
-                } catch {
-                    const errorMessage = `Telegram error ${status}`;
-                    outputChannel.appendLine(errorMessage);
-                    return { success: false, errorMessage };
-                }
-            } catch (err: unknown) {
-                const errorMessage = err instanceof Error ? err.message : String(err);
-                outputChannel.appendLine(errorMessage);
-                return { success: false, errorMessage };
-            }
-        },
-    };
+		async sendTestNotification(token: string, chatId: string): Promise<NotificationResult> {
+			const text = [COMPLETION_LABEL, new Date().toISOString()].join('\n');
+			return postMessage(token, chatId, text);
+		},
+	};
 }

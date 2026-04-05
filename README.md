@@ -41,8 +41,8 @@ VS Code **1.90.0 or later** is required.
 
 ```bash
 # Clone the repository
-git clone https://github.com/devbehkami/vscode-copilot-telegram-notification.git
-cd vscode-copilot-telegram-notification
+git clone https://github.com/ranjbar-dev/vscode-copilot-telegram-notif.git
+cd vscode-copilot-telegram-notif
 
 # Install dependencies
 npm install
@@ -166,10 +166,10 @@ All settings are in the `copilotNotify` namespace and can be configured in VS Co
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the release history.
+See `CHANGELOG.md` in the repository for the release history.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see `LICENSE` in the repository.
